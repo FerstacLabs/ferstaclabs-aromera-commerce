@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MessageCircle, ShieldCheck, Truck } from "lucide-react";
+import { SafeProductImage } from "@/components/SafeProductImage";
 import { SiteShell } from "@/components/SiteShell";
 import { fetchProduct, products, shop } from "@/lib/data";
 import { AddToCartButton } from "./product-actions";
@@ -18,7 +18,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     <SiteShell>
       <section className="container grid gap-8 py-10 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-[var(--mist)]">
-          <Image src={product.mainImageUrl} alt={product.name} fill className="object-cover" priority />
+          <SafeProductImage src={product.mainImageUrl} alt={product.name} fill className="object-cover" priority sizes="(max-width: 1024px) 100vw, 45vw" />
         </div>
         <div>
           <p className="text-sm font-bold uppercase text-[var(--gold)]">{product.brand}</p>

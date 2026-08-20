@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { SafeProductImage } from "../SafeProductImage";
 
 export function CartView() {
   const { items, remove, setQuantity } = useCart();
@@ -25,7 +25,7 @@ export function CartView() {
         {items.map((item) => (
           <div key={item.id} className="card grid grid-cols-[96px_1fr] gap-4 p-3">
             <div className="relative aspect-square overflow-hidden rounded-md bg-[var(--mist)]">
-              <Image src={item.mainImageUrl} alt={item.name} fill className="object-cover" />
+              <SafeProductImage src={item.mainImageUrl} alt={item.name} fill className="object-cover" sizes="96px" />
             </div>
             <div className="grid gap-2">
               <div className="flex items-start justify-between gap-3">

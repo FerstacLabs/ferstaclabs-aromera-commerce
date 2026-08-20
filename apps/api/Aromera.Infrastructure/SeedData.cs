@@ -7,44 +7,56 @@ public static class SeedData
 {
     public static async Task EnsureSeededAsync(AromeraDbContext db, IPasswordHasher hasher, CancellationToken cancellationToken = default)
     {
-        if (await db.Shops.AnyAsync(cancellationToken)) return;
-
-        var shop = new Shop
+        var shopId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == "aromera", cancellationToken);
+        if (shop is null)
         {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Name = "Aromera",
-            Slug = "aromera",
-            LegalName = "Aromera MMC",
-            Voen = "0000000001",
-            Phone = "+994 50 555 55 55",
-            WhatsApp = "+994 50 555 55 55",
-            Email = "salam@aromera.az",
-            Instagram = "@aromera.az",
-            Address = "Bakı, Azərbaycan"
-        };
+            shop = new Shop
+            {
+                Id = shopId,
+                Name = "Aromera",
+                Slug = "aromera",
+                LegalName = "Aromera MMC",
+                Voen = "0000000001",
+                Phone = "+994 50 555 55 55",
+                WhatsApp = "+994 50 555 55 55",
+                Email = "salam@aromera.az",
+                Instagram = "@aromera.az",
+                Address = "Bakı, Azərbaycan"
+            };
+            db.Shops.Add(shop);
+        }
+        else
+        {
+            shopId = shop.Id;
+            shop.Name = "Aromera";
+            shop.Phone = "+994 50 555 55 55";
+            shop.WhatsApp = "+994 50 555 55 55";
+            shop.Address = "Bakı, Azərbaycan";
+            shop.IsActive = true;
+            shop.UpdatedAt = DateTimeOffset.UtcNow;
+        }
 
         var categoryNames = new[]
         {
             "Kişi ətirləri", "Qadın ətirləri", "Unisex ətirlər", "Oud kolleksiyası",
             "Hədiyyəlik setlər", "Yeni gələnlər", "Endirimli məhsullar"
         };
-        var categories = categoryNames.Select((name, index) => new Category
+        var categories = new List<Category>();
+        var existingCategories = await db.Categories.Where(x => x.ShopId == shopId).ToDictionaryAsync(x => x.Slug, cancellationToken);
+        foreach (var name in categoryNames)
         {
-            Id = Guid.NewGuid(),
-            ShopId = shop.Id,
-            Name = name,
-            Slug = Slugify(name),
-            Description = $"{name} üçün Aromera seçimi",
-            IsActive = true
-        }).ToList();
-
-        var imageBase = "https://images.unsplash.com/photo-";
-        var imageIds = new[]
-        {
-            "1541643600914-78b084683601", "1594035910387-fea47794261f", "1587017539504-67cfbddac569",
-            "1615634260167-c8cdede054de", "1608528577891-eb055944f2e2", "1595425959632-34f2822322ce",
-            "1563170351-be82bc888aa4", "1592914610354-fd354ea45e48"
-        };
+            var slug = Slugify(name);
+            if (!existingCategories.TryGetValue(slug, out var category))
+            {
+                category = new Category { Id = Guid.NewGuid(), ShopId = shopId, Slug = slug };
+                db.Categories.Add(category);
+            }
+            category.Name = name;
+            category.Description = $"{name} üçün Aromera seçimi";
+            category.IsActive = true;
+            categories.Add(category);
+        }
 
         var productNames = new[]
         {
@@ -54,14 +66,14 @@ public static class SeedData
             "Leather Noir", "Bergamot Silk", "Vanilla Ember", "Musk Atelier", "Pearl Garden", "Crimson Spice"
         };
 
-        var products = productNames.Select((name, index) =>
+        var productTemplates = productNames.Select((name, index) =>
         {
             var category = categories[index % categories.Count];
             var price = 64 + index * 5;
             return new Product
             {
                 Id = Guid.NewGuid(),
-                ShopId = shop.Id,
+                ShopId = shopId,
                 CategoryId = category.Id,
                 Name = name,
                 Slug = Slugify(name),
@@ -74,23 +86,54 @@ public static class SeedData
                 StockQuantity = 8 + index,
                 Volume = index % 3 == 0 ? "50ml" : index % 3 == 1 ? "75ml" : "100ml",
                 Concentration = index % 3 == 0 ? "EDP" : index % 3 == 1 ? "Parfum" : "EDT",
-                MainImageUrl = $"{imageBase}{imageIds[index % imageIds.Length]}?auto=format&fit=crop&w=900&q=85",
+                MainImageUrl = $"/products/{Slugify(name)}.svg",
                 IsFeatured = index < 8,
                 IsBestseller = index % 4 == 0,
                 IsActive = true
             };
         }).ToList();
 
+        var existingProducts = await db.Products.Where(x => x.ShopId == shopId).ToDictionaryAsync(x => x.Slug, cancellationToken);
+        var products = new List<Product>();
+        foreach (var template in productTemplates)
+        {
+            if (!existingProducts.TryGetValue(template.Slug, out var product))
+            {
+                product = template;
+                db.Products.Add(product);
+            }
+            else
+            {
+                product.CategoryId = template.CategoryId;
+                product.Name = template.Name;
+                product.Brand = template.Brand;
+                product.Gender = template.Gender;
+                product.ShortDescription = template.ShortDescription;
+                product.Description = template.Description;
+                product.Price = template.Price;
+                product.OldPrice = template.OldPrice;
+                product.StockQuantity = Math.Max(product.StockQuantity, template.StockQuantity);
+                product.Volume = template.Volume;
+                product.Concentration = template.Concentration;
+                product.MainImageUrl = template.MainImageUrl;
+                product.IsFeatured = template.IsFeatured;
+                product.IsBestseller = template.IsBestseller;
+                product.IsActive = true;
+                product.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+            products.Add(product);
+        }
+
         var customers = new[]
         {
-            new Customer { Id = Guid.NewGuid(), ShopId = shop.Id, Name = "Leyla Məmmədova", Phone = "+994 55 222 10 11", Address = "Nərimanov, Bakı" },
-            new Customer { Id = Guid.NewGuid(), ShopId = shop.Id, Name = "Rauf Əliyev", Phone = "+994 50 333 20 22", Address = "Yasamal, Bakı" }
+            new Customer { Id = Guid.NewGuid(), ShopId = shopId, Name = "Leyla Məmmədova", Phone = "+994 55 222 10 11", Address = "Nərimanov, Bakı" },
+            new Customer { Id = Guid.NewGuid(), ShopId = shopId, Name = "Rauf Əliyev", Phone = "+994 50 333 20 22", Address = "Yasamal, Bakı" }
         };
 
         var orders = customers.Select((customer, index) => new Order
         {
             Id = Guid.NewGuid(),
-            ShopId = shop.Id,
+            ShopId = shopId,
             CustomerId = customer.Id,
             OrderNumber = $"ARO-{DateTime.UtcNow:yyyyMMdd}-{1000 + index}",
             Status = index == 0 ? "paid" : "packed",
@@ -117,24 +160,36 @@ public static class SeedData
             });
         }
 
-        db.Shops.Add(shop);
-        db.Categories.AddRange(categories);
-        db.Products.AddRange(products);
-        db.Users.Add(new User
+        if (!await db.Users.AnyAsync(x => x.Email == "admin@aromera.az", cancellationToken))
         {
-            ShopId = shop.Id,
-            Email = "admin@aromera.az",
-            PasswordHash = hasher.Hash("Admin123!ChangeMe"),
-            Role = "owner"
-        });
-        db.PaymentProviderSettings.AddRange(
-            new PaymentProviderSetting { ShopId = shop.Id, Provider = "Mock", IsEnabled = true, IsTestMode = true },
-            new PaymentProviderSetting { ShopId = shop.Id, Provider = "Epoint", IsEnabled = false, IsTestMode = true },
-            new PaymentProviderSetting { ShopId = shop.Id, Provider = "Payriff", IsEnabled = false, IsTestMode = true });
-        db.DeliverySettings.Add(new DeliverySetting { ShopId = shop.Id, Note = "Bakı daxili çatdırılma mövcuddur" });
-        db.ThemeSettings.Add(new ThemeSetting { ShopId = shop.Id });
-        db.Customers.AddRange(customers);
-        db.Orders.AddRange(orders);
+            db.Users.Add(new User
+            {
+                ShopId = shopId,
+                Email = "admin@aromera.az",
+                PasswordHash = hasher.Hash("Admin123!ChangeMe"),
+                Role = "owner"
+            });
+        }
+
+        if (!await db.PaymentProviderSettings.AnyAsync(x => x.ShopId == shopId, cancellationToken))
+        {
+            db.PaymentProviderSettings.AddRange(
+                new PaymentProviderSetting { ShopId = shopId, Provider = "Mock", IsEnabled = true, IsTestMode = true },
+                new PaymentProviderSetting { ShopId = shopId, Provider = "Epoint", IsEnabled = false, IsTestMode = true },
+                new PaymentProviderSetting { ShopId = shopId, Provider = "Payriff", IsEnabled = false, IsTestMode = true });
+        }
+
+        if (!await db.DeliverySettings.AnyAsync(x => x.ShopId == shopId, cancellationToken))
+            db.DeliverySettings.Add(new DeliverySetting { ShopId = shopId, Note = "Bakı daxili çatdırılma mövcuddur" });
+
+        if (!await db.ThemeSettings.AnyAsync(x => x.ShopId == shopId, cancellationToken))
+            db.ThemeSettings.Add(new ThemeSetting { ShopId = shopId });
+
+        if (!await db.Orders.AnyAsync(x => x.ShopId == shopId, cancellationToken))
+        {
+            db.Customers.AddRange(customers);
+            db.Orders.AddRange(orders);
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
 

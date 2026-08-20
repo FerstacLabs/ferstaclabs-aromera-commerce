@@ -48,17 +48,6 @@ export const categories: Category[] = [
   { id: "c7", name: "Endirimli məhsullar", slug: "endirimli-mehsullar", description: "Seçilmiş qiymət fürsətləri" },
 ];
 
-const imageIds = [
-  "1541643600914-78b084683601",
-  "1594035910387-fea47794261f",
-  "1587017539504-67cfbddac569",
-  "1615634260167-c8cdede054de",
-  "1608528577891-eb055944f2e2",
-  "1595425959632-34f2822322ce",
-  "1563170351-be82bc888aa4",
-  "1592914610354-fd354ea45e48",
-];
-
 const names = [
   "Aromera Noir Essence",
   "Velvet Oud",
@@ -106,7 +95,7 @@ export const products: Product[] = names.map((name, index) => {
     stockQuantity: 8 + index,
     volume: index % 3 === 0 ? "50ml" : index % 3 === 1 ? "75ml" : "100ml",
     concentration: index % 3 === 0 ? "EDP" : index % 3 === 1 ? "Parfum" : "EDT",
-    mainImageUrl: `https://images.unsplash.com/photo-${imageIds[index % imageIds.length]}?auto=format&fit=crop&w=900&q=85`,
+    mainImageUrl: `/products/${slugify(name)}.svg`,
     isFeatured: index < 8,
     isBestseller: index % 4 === 0,
     isActive: true,
