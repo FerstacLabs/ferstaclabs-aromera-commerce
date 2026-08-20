@@ -22,7 +22,7 @@ export default async function HomePage() {
               <a className="ghost-button" href={shop.whatsappLink}><MessageCircle size={18} /> WhatsApp ilə sifariş</a>
             </div>
           </div>
-          <div className="relative min-h-[420px] overflow-hidden rounded-lg bg-[url('/products/aromera-noir-essence.svg')] bg-cover bg-center shadow-2xl" />
+          <div className="relative min-h-[420px] overflow-hidden rounded-lg bg-[url('/products/aromera-noir-essence.webp')] bg-cover bg-center shadow-2xl" />
         </div>
       </section>
 

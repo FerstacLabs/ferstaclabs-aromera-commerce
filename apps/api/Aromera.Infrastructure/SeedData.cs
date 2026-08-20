@@ -60,10 +60,25 @@ public static class SeedData
 
         var productNames = new[]
         {
-            "Aromera Noir Essence", "Velvet Oud", "Royal Amber", "Citrus Bloom", "Midnight Musk", "Golden Saffron",
-            "Ocean Mist", "Rose Imperial", "Silver Cedar", "Amber Dusk", "White Neroli", "Satin Peony",
-            "Tuscan Fig", "Sandal Veil", "Aqua Basil", "Cashmere Iris", "Oud Mirage", "Jasmine Aura",
-            "Leather Noir", "Bergamot Silk", "Vanilla Ember", "Musk Atelier", "Pearl Garden", "Crimson Spice"
+            "Aromera Noir Essence", "Midnight Musk", "Oud Mirage", "Silver Cedar", "Citrus Bloom", "Golden Saffron",
+            "Ocean Mist", "Rose Imperial", "Velvet Oud", "Royal Amber", "Tuscan Fig", "White Neroli",
+            "Amber Veil", "Saffron Night", "Musk Royale", "Bergamot Sky", "Vanilla Dusk", "Cedar Wood",
+            "Rose Noir", "Aqua Vetiver", "Jasmine Cloud", "Noir Absolute", "Imperial Oud", "Fresh Amber"
+        };
+        var legacySlugBySlug = new Dictionary<string, string>
+        {
+            ["amber-veil"] = "amber-dusk",
+            ["saffron-night"] = "satin-peony",
+            ["musk-royale"] = "sandal-veil",
+            ["bergamot-sky"] = "aqua-basil",
+            ["vanilla-dusk"] = "cashmere-iris",
+            ["cedar-wood"] = "jasmine-aura",
+            ["rose-noir"] = "leather-noir",
+            ["aqua-vetiver"] = "bergamot-silk",
+            ["jasmine-cloud"] = "vanilla-ember",
+            ["noir-absolute"] = "musk-atelier",
+            ["imperial-oud"] = "pearl-garden",
+            ["fresh-amber"] = "crimson-spice"
         };
 
         var productTemplates = productNames.Select((name, index) =>
@@ -86,7 +101,7 @@ public static class SeedData
                 StockQuantity = 8 + index,
                 Volume = index % 3 == 0 ? "50ml" : index % 3 == 1 ? "75ml" : "100ml",
                 Concentration = index % 3 == 0 ? "EDP" : index % 3 == 1 ? "Parfum" : "EDT",
-                MainImageUrl = $"/products/{Slugify(name)}.svg",
+                MainImageUrl = $"/products/{Slugify(name)}.webp",
                 IsFeatured = index < 8,
                 IsBestseller = index % 4 == 0,
                 IsActive = true
@@ -97,7 +112,15 @@ public static class SeedData
         var products = new List<Product>();
         foreach (var template in productTemplates)
         {
-            if (!existingProducts.TryGetValue(template.Slug, out var product))
+            if (!existingProducts.TryGetValue(template.Slug, out var product)
+                && legacySlugBySlug.TryGetValue(template.Slug, out var legacySlug)
+                && existingProducts.TryGetValue(legacySlug, out var legacyProduct))
+            {
+                product = legacyProduct;
+                product.Slug = template.Slug;
+            }
+
+            if (product is null)
             {
                 product = template;
                 db.Products.Add(product);
@@ -122,6 +145,16 @@ public static class SeedData
                 product.UpdatedAt = DateTimeOffset.UtcNow;
             }
             products.Add(product);
+        }
+
+        var seededSlugs = productTemplates.Select(x => x.Slug).ToHashSet();
+        foreach (var legacySlug in legacySlugBySlug.Values)
+        {
+            if (existingProducts.TryGetValue(legacySlug, out var legacyProduct) && !seededSlugs.Contains(legacyProduct.Slug))
+            {
+                legacyProduct.IsActive = false;
+                legacyProduct.UpdatedAt = DateTimeOffset.UtcNow;
+            }
         }
 
         var customers = new[]

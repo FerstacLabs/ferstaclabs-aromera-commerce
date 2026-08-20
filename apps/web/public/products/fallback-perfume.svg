@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Aromera perfume fallback">
-  <rect width="800" height="1000" fill="#f3eee6"/>
-  <rect x="150" y="120" width="500" height="760" rx="36" fill="#fffaf1" stroke="#d8c69c" stroke-width="6"/>
-  <path d="M330 245h140v86H330z" fill="#1a1714"/>
-  <path d="M300 330h200c38 0 70 32 70 70v300c0 58-47 105-105 105H335c-58 0-105-47-105-105V400c0-38 32-70 70-70z" fill="#f8f0dd" stroke="#b89146" stroke-width="8"/>
-  <rect x="300" y="486" width="200" height="150" rx="14" fill="#171513"/>
-  <text x="400" y="550" text-anchor="middle" font-family="Georgia, serif" font-size="46" font-weight="700" fill="#f4dfaa">Aromera</text>
-  <text x="400" y="604" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#f7edda">Premium Perfume</text>
-</svg>

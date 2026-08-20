@@ -3,7 +3,7 @@
 import Image, { type ImageProps } from "next/image";
 import { useMemo, useState } from "react";
 
-const FALLBACK_IMAGE = "/products/fallback-perfume.svg";
+const FALLBACK_IMAGE = "/products/fallback-perfume.webp";
 
 type SafeProductImageProps = Omit<ImageProps, "src"> & {
   src?: string | null;

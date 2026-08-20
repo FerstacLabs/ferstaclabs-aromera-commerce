@@ -91,7 +91,7 @@ Passwords are stored with PBKDF2 hashing.
 
 ## Product Images
 
-Product images are served from `apps/web/public/products`. Seeded product `MainImageUrl` values should use the `/products/{slug}.svg` format, for example `/products/midnight-musk.svg`. The seed routine also updates existing Aromera products by `ShopId + Slug` on startup so production databases with older external image URLs are corrected without duplicating products.
+Product images are served from `apps/web/public/products`. Seeded product `MainImageUrl` values should use the `/products/{slug}.webp` format, for example `/products/midnight-musk.webp`. The seed routine also updates existing Aromera products by `ShopId + Slug` on startup so production databases with older external image URLs are corrected without duplicating products.
 
 ## API Highlights
 
