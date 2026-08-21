@@ -12,9 +12,12 @@ export default function AdminOrdersPage() {
         <Table rowKey="id" dataSource={orders} columns={[
           { title: "Order", dataIndex: "orderNumber" },
           { title: "Customer", dataIndex: "customerName" },
-          { title: "Status", dataIndex: "status", render: (value) => <Select defaultValue={value} options={orderStatuses.map((item) => ({ value: item, label: item }))} style={{ minWidth: 170 }} /> },
-          { title: "Payment", dataIndex: "paymentStatus" },
+          { title: "Phone", dataIndex: "customerPhone" },
           { title: "Total", dataIndex: "total", render: (value) => `${value} AZN` },
+          { title: "Status", dataIndex: "status", render: (value) => <Select defaultValue={value} options={orderStatuses.map((item) => ({ value: item, label: item }))} style={{ minWidth: 170 }} /> },
+          { title: "Payment method", dataIndex: "paymentMethod" },
+          { title: "Payment status", dataIndex: "paymentStatus" },
+          { title: "Created", dataIndex: "createdAt", render: (value) => new Date(value).toLocaleDateString("az-AZ") },
           { title: "", render: (_, row) => <Link href={`/admin/orders/${row.id}`}>Open</Link> },
         ]} />
       </Card>

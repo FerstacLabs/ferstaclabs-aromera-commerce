@@ -13,7 +13,24 @@ public sealed record CheckoutRequest(
     string PaymentMethod,
     List<CheckoutItem> Items);
 
-public sealed record PaymentCreateRequest(Guid OrderId, string Provider);
+public sealed record CheckoutResponse(
+    Guid OrderId,
+    string OrderNumber,
+    bool PaymentRequired,
+    string PaymentProvider,
+    string PaymentStatus,
+    string? RedirectUrl);
+public sealed record PaymentCreateRequest(Guid OrderId, string? Provider = null);
+public sealed record PaymentCreateResponse(
+    Guid OrderId,
+    string OrderNumber,
+    string Provider,
+    decimal Amount,
+    string Currency,
+    bool RequiresInternalCardModal,
+    string? RedirectUrl,
+    string? PaymentUrl);
+public sealed record MockPaymentConfirmRequest(Guid OrderId, string Result);
 public sealed record PaymentResult(Guid OrderId, string Status, string RedirectUrl, string Provider);
 public sealed record UpsertProductRequest(
     Guid? CategoryId,

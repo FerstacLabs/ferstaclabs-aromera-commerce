@@ -6,9 +6,9 @@ export const dashboard = {
 };
 
 export const orders = [
-  { id: "o1", orderNumber: "ARO-20260820-1001", customerName: "Leyla Məmmədova", status: "paid", paymentStatus: "paid", total: 146 },
-  { id: "o2", orderNumber: "ARO-20260820-1002", customerName: "Rauf Əliyev", status: "packed", paymentStatus: "paid", total: 178 },
-  { id: "o3", orderNumber: "ARO-20260820-1003", customerName: "Nigar Həsənova", status: "awaiting_payment", paymentStatus: "pending", total: 92 },
+  { id: "o1", orderNumber: "ARO-20260820-1001", customerName: "Leyla Məmmədova", customerPhone: "+994 55 222 10 11", status: "paid", paymentMethod: "Kartla ödəniş", paymentStatus: "paid", total: 146, createdAt: "2026-08-20T11:30:00Z" },
+  { id: "o2", orderNumber: "ARO-20260820-1002", customerName: "Rauf Əliyev", customerPhone: "+994 50 333 20 22", status: "packed", paymentMethod: "Çatdırılma zamanı", paymentStatus: "unpaid", total: 178, createdAt: "2026-08-20T13:10:00Z" },
+  { id: "o3", orderNumber: "ARO-20260820-1003", customerName: "Nigar Həsənova", customerPhone: "+994 70 444 30 33", status: "awaiting_payment", paymentMethod: "Kartla ödəniş", paymentStatus: "pending", total: 92, createdAt: "2026-08-20T15:42:00Z" },
 ];
 
 export const customers = [

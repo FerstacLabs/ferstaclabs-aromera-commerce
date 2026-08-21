@@ -28,7 +28,7 @@ public sealed class MockPaymentProvider : IPaymentProvider
 
     public Task<PaymentResult> CreateAsync(Shop shop, Order order, CancellationToken cancellationToken)
     {
-        return Task.FromResult(new PaymentResult(order.Id, "paid", $"/checkout/success?orderId={order.Id}", Name));
+        return Task.FromResult(new PaymentResult(order.Id, "pending", "", Name));
     }
 
     public Task<bool> ValidateCallbackAsync(Dictionary<string, string> payload, CancellationToken cancellationToken)

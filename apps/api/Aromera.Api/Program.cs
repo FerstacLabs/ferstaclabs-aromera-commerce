@@ -118,7 +118,7 @@ app.MapGet("/api/{shopSlug}/products/{slug}", async (string shopSlug, string slu
     return product is null ? Results.NotFound() : Results.Ok(product);
 });
 
-app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest request, AromeraDbContext db, PaymentProviderFactory paymentFactory) =>
+app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest request, AromeraDbContext db, IConfiguration configuration) =>
 {
     if (request.Items.Count == 0 || string.IsNullOrWhiteSpace(request.CustomerName) || string.IsNullOrWhiteSpace(request.CustomerPhone))
         return Results.BadRequest(new { message = "Məlumatları tam doldurun." });
@@ -154,19 +154,21 @@ app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest 
     db.Customers.Add(customer);
     db.Orders.Add(order);
 
-    var providerName = request.PaymentMethod == "card" ? "Mock" : "Cash";
+    var providerName = request.PaymentMethod == "card"
+        ? configuration["Payments:DefaultProvider"] ?? "Mock"
+        : request.PaymentMethod == "whatsapp" ? "WhatsApp" : "Cash";
     var payment = new Payment { ShopId = shop.Id, OrderId = order.Id, Provider = providerName, Amount = order.Total, Status = request.PaymentMethod == "card" ? "pending" : "unpaid" };
     db.Payments.Add(payment);
     await db.SaveChangesAsync();
 
-    if (request.PaymentMethod != "card") return Results.Ok(new PaymentResult(order.Id, order.PaymentStatus, $"/checkout/success?orderId={order.Id}", providerName));
-    var result = await paymentFactory.Get("Mock").CreateAsync(shop, order, CancellationToken.None);
-    order.Status = "paid";
-    order.PaymentStatus = "paid";
-    payment.Status = "paid";
-    payment.ProviderTransactionId = $"mock_{order.Id:N}";
-    await db.SaveChangesAsync();
-    return Results.Ok(result);
+    var successUrl = $"/checkout/success?orderNumber={Uri.EscapeDataString(order.OrderNumber)}&paymentStatus={order.PaymentStatus}";
+    return Results.Ok(new CheckoutResponse(
+        order.Id,
+        order.OrderNumber,
+        request.PaymentMethod == "card",
+        providerName,
+        order.PaymentStatus,
+        request.PaymentMethod == "card" ? null : successUrl));
 });
 
 app.MapPost("/api/{shopSlug}/payments/create", async (string shopSlug, PaymentCreateRequest request, AromeraDbContext db, PaymentProviderFactory factory) =>
@@ -174,8 +176,62 @@ app.MapPost("/api/{shopSlug}/payments/create", async (string shopSlug, PaymentCr
     var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
     var order = await db.Orders.FirstOrDefaultAsync(x => x.Id == request.OrderId && shop != null && x.ShopId == shop.Id);
     if (shop is null || order is null) return Results.NotFound();
-    var result = await factory.Get(request.Provider).CreateAsync(shop, order, CancellationToken.None);
-    return Results.Ok(result);
+    var payment = await db.Payments.FirstOrDefaultAsync(x => x.ShopId == shop.Id && x.OrderId == order.Id);
+    var providerName = request.Provider ?? payment?.Provider ?? "Mock";
+    if (payment is null)
+    {
+        payment = new Payment { ShopId = shop.Id, OrderId = order.Id, Provider = providerName, Amount = order.Total, Status = "pending" };
+        db.Payments.Add(payment);
+        await db.SaveChangesAsync();
+    }
+
+    if (providerName.Equals("Mock", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Ok(new PaymentCreateResponse(order.Id, order.OrderNumber, "Mock", order.Total, "AZN", true, null, null));
+    }
+
+    var result = await factory.Get(providerName).CreateAsync(shop, order, CancellationToken.None);
+    var redirect = string.IsNullOrWhiteSpace(result.RedirectUrl) ? null : result.RedirectUrl;
+    return Results.Ok(new PaymentCreateResponse(
+        order.Id,
+        order.OrderNumber,
+        result.Provider,
+        order.Total,
+        "AZN",
+        false,
+        redirect,
+        redirect));
+});
+app.MapPost("/api/{shopSlug}/payments/mock/confirm", async (string shopSlug, MockPaymentConfirmRequest request, AromeraDbContext db) =>
+{
+    if (request.Result is not ("success" or "failed")) return Results.BadRequest(new { message = "Yanlış ödəniş nəticəsi." });
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var order = await db.Orders.FirstOrDefaultAsync(x => x.Id == request.OrderId && shop != null && x.ShopId == shop.Id);
+    if (shop is null || order is null) return Results.NotFound();
+    var payment = await db.Payments.FirstOrDefaultAsync(x => x.ShopId == shop.Id && x.OrderId == order.Id);
+    if (payment is null)
+    {
+        payment = new Payment { ShopId = shop.Id, OrderId = order.Id, Provider = "Mock", Amount = order.Total, Status = "pending" };
+        db.Payments.Add(payment);
+    }
+
+    if (request.Result == "success")
+    {
+        payment.Status = "paid";
+        payment.ProviderTransactionId ??= $"mock_{order.Id:N}";
+        order.PaymentStatus = "paid";
+        order.Status = "paid";
+    }
+    else
+    {
+        payment.Status = "failed";
+        order.PaymentStatus = "failed";
+        order.Status = "awaiting_payment";
+    }
+    payment.UpdatedAt = DateTimeOffset.UtcNow;
+    order.UpdatedAt = DateTimeOffset.UtcNow;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { orderId = order.Id, orderNumber = order.OrderNumber, status = payment.Status, paymentStatus = order.PaymentStatus });
 });
 app.MapPost("/api/{shopSlug}/payments/epoint/callback", async (string shopSlug, Dictionary<string, string> payload, PaymentProviderFactory factory) =>
     await factory.Get("Epoint").ValidateCallbackAsync(payload, CancellationToken.None) ? Results.Ok() : Results.BadRequest());
@@ -247,7 +303,39 @@ admin.MapDelete("/categories/{id:guid}", async (Guid id, ClaimsPrincipal user, A
 admin.MapGet("/orders", async (ClaimsPrincipal user, AromeraDbContext db) =>
 {
     var shopId = ShopId(user);
-    return await db.Orders.Include(x => x.Items).Where(x => x.ShopId == shopId).OrderByDescending(x => x.CreatedAt).ToListAsync();
+    var rows = await db.Orders
+        .Include(x => x.Items)
+        .Where(x => x.ShopId == shopId)
+        .OrderByDescending(x => x.CreatedAt)
+        .Select(order => new
+        {
+            order.Id,
+            order.OrderNumber,
+            order.CustomerName,
+            order.CustomerPhone,
+            order.Total,
+            order.Status,
+            order.PaymentStatus,
+            PaymentProvider = db.Payments.Where(payment => payment.OrderId == order.Id).Select(payment => payment.Provider).FirstOrDefault() ?? "Cash",
+            order.CreatedAt,
+            order.Items
+        })
+        .ToListAsync();
+    return rows.Select(order => new
+    {
+        order.Id,
+        order.OrderNumber,
+        order.CustomerName,
+        order.CustomerPhone,
+        order.Total,
+        order.Status,
+        order.PaymentStatus,
+        PaymentMethod = order.PaymentProvider is "Mock" or "Epoint" or "Payriff"
+            ? "Kartla ödəniş"
+            : order.PaymentProvider == "WhatsApp" ? "WhatsApp ilə sifariş" : "Çatdırılma zamanı",
+        order.CreatedAt,
+        order.Items
+    });
 });
 admin.MapGet("/orders/{id:guid}", async (Guid id, ClaimsPrincipal user, AromeraDbContext db) =>
 {
