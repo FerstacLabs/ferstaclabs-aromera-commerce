@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useShop } from "@/components/ShopProvider";
 import { LockKeyhole, X } from "lucide-react";
 
 type CardPaymentModalProps = {
@@ -17,12 +18,30 @@ type CardPaymentModalProps = {
 type FieldErrors = Partial<Record<"cardNumber" | "expiry" | "cvv" | "cardholderName", string>>;
 
 export function CardPaymentModal({ open, amount, currency, orderNumber, processing, error, onCancel, onConfirm }: CardPaymentModalProps) {
+  const shop = useShop();
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
   const [cardholderName, setCardholderName] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const total = useMemo(() => `${amount.toFixed(2)} ${currency}`, [amount, currency]);
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    dialog.current?.querySelector<HTMLInputElement>("input")?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !processing) onCancel();
+      if (event.key !== "Tab") return;
+      const controls = dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)');
+      if (!controls?.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", keyboard);
+    return () => { document.removeEventListener("keydown", keyboard); previous?.focus(); };
+  }, [open, processing, onCancel]);
 
   if (!open) return null;
 
@@ -36,10 +55,10 @@ export function CardPaymentModal({ open, amount, currency, orderNumber, processi
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-[480px] overflow-hidden rounded-lg border border-[var(--line)] bg-[#fffdf8] shadow-2xl">
+      <div ref={dialog} role="dialog" aria-modal="true" aria-label="Kartla ödəniş" className="max-h-[90svh] overflow-y-auto w-full max-w-[480px] overflow-hidden rounded-lg border border-[var(--line)] bg-[#fffdf8] shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] bg-[#171513] p-5 text-white">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-[#d9bd7d]">Aromera</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-[#d9bd7d]">EH / {shop.name}</p>
             <h2 className="display mt-1 text-3xl font-bold">Kartla ödəniş</h2>
           </div>
           <button aria-label="Bağla" className="rounded p-1 text-white/80 hover:bg-white/10" onClick={onCancel} type="button">
@@ -51,7 +70,7 @@ export function CardPaymentModal({ open, amount, currency, orderNumber, processi
           <div className="rounded-md border border-[var(--line)] bg-[#f7f0e3] p-4">
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm text-[var(--soft-ink)]">Sifariş</span>
-              <strong>{orderNumber}</strong>
+              <strong className="break-all text-right">{orderNumber}</strong>
             </div>
             <div className="mt-2 flex items-center justify-between gap-4">
               <span className="text-sm text-[var(--soft-ink)]">Cəmi</span>

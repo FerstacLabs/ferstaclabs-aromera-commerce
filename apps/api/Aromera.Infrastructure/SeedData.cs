@@ -8,39 +8,29 @@ public static class SeedData
     public static async Task EnsureSeededAsync(AromeraDbContext db, IPasswordHasher hasher, CancellationToken cancellationToken = default)
     {
         var shopId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == "aromera", cancellationToken);
+        var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == "ehdi-parfum" || x.Slug == "aromera", cancellationToken);
         if (shop is null)
         {
             shop = new Shop
             {
                 Id = shopId,
-                Name = "Aromera",
-                Slug = "aromera",
-                LegalName = "Aromera MMC",
-                Voen = "0000000001",
-                Phone = "+994 50 555 55 55",
-                WhatsApp = "+994 50 555 55 55",
-                Email = "salam@aromera.az",
-                Instagram = "@aromera.az",
-                Address = "Bakı, Azərbaycan"
+                Name = "Əhdi Parfum",
+                Slug = "ehdi-parfum",
+                Phone = "+994556994666",
+                WhatsApp = "+994556994666",
+                Address = "Bakı şəhəri, Qara Qarayev küçəsi 74A"
             };
             db.Shops.Add(shop);
         }
         else
         {
             shopId = shop.Id;
-            shop.Name = "Aromera";
-            shop.Phone = "+994 50 555 55 55";
-            shop.WhatsApp = "+994 50 555 55 55";
-            shop.Address = "Bakı, Azərbaycan";
-            shop.IsActive = true;
-            shop.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         var categoryNames = new[]
         {
-            "Kişi ətirləri", "Qadın ətirləri", "Unisex ətirlər", "Oud kolleksiyası",
-            "Hədiyyəlik setlər", "Yeni gələnlər", "Endirimli məhsullar"
+            "Kişi ətirləri", "Qadın ətirləri", "Unisex ətirlər", "Premium seçimlər",
+            "Hədiyyə seçimləri", "Yeni gələnlər", "Endirimli məhsullar"
         };
         var categories = new List<Category>();
         var existingCategories = await db.Categories.Where(x => x.ShopId == shopId).ToDictionaryAsync(x => x.Slug, cancellationToken);
@@ -49,24 +39,22 @@ public static class SeedData
             var slug = Slugify(name);
             if (!existingCategories.TryGetValue(slug, out var category))
             {
-                category = new Category { Id = Guid.NewGuid(), ShopId = shopId, Slug = slug };
+                category = new Category { Id = Guid.NewGuid(), ShopId = shopId, Slug = slug, Name = name, Description = $"{name} ilə tanış olun" };
                 db.Categories.Add(category);
             }
-            category.Name = name;
-            category.Description = $"{name} üçün Aromera seçimi";
-            category.IsActive = true;
             categories.Add(category);
         }
 
         var productNames = new[]
         {
-            "Aromera Noir Essence", "Midnight Musk", "Oud Mirage", "Silver Cedar", "Citrus Bloom", "Golden Saffron",
+            "Noir Essence", "Midnight Musk", "Oud Mirage", "Silver Cedar", "Citrus Bloom", "Golden Saffron",
             "Ocean Mist", "Rose Imperial", "Velvet Oud", "Royal Amber", "Tuscan Fig", "White Neroli",
             "Amber Veil", "Saffron Night", "Musk Royale", "Bergamot Sky", "Vanilla Dusk", "Cedar Wood",
             "Rose Noir", "Aqua Vetiver", "Jasmine Cloud", "Noir Absolute", "Imperial Oud", "Fresh Amber"
         };
         var legacySlugBySlug = new Dictionary<string, string>
         {
+            ["noir-essence"] = "aromera-noir-essence",
             ["amber-veil"] = "amber-dusk",
             ["saffron-night"] = "satin-peony",
             ["musk-royale"] = "sandal-veil",
@@ -92,10 +80,10 @@ public static class SeedData
                 CategoryId = category.Id,
                 Name = name,
                 Slug = Slugify(name),
-                Brand = index % 3 == 0 ? "Aromera Private" : index % 3 == 1 ? "Maison Aura" : "Noir Atelier",
+                Brand = index % 3 == 0 ? "Əhdi Selection" : index % 3 == 1 ? "Premium Collection" : "Signature Collection",
                 Gender = index % 3 == 0 ? "unisex" : index % 3 == 1 ? "qadın" : "kişi",
                 ShortDescription = "Zərif notlarla gündəlik stilə premium toxunuş.",
-                Description = $"{name} isti, təmiz və yadda qalan akkordları birləşdirən seçilmiş ətirdir. Bakı ritminə uyğun uzunömürlü, səliqəli və hədiyyə üçün ideal kompozisiya kimi hazırlanıb.",
+                Description = $"{name} haqqında ətraflı məlumat və mövcud seçimlər üçün mağaza ilə əlaqə saxlayın.",
                 Price = price,
                 OldPrice = index % 5 == 0 ? price + 18 : null,
                 StockQuantity = 8 + index,
@@ -127,22 +115,10 @@ public static class SeedData
             }
             else
             {
-                product.CategoryId = template.CategoryId;
-                product.Name = template.Name;
-                product.Brand = template.Brand;
-                product.Gender = template.Gender;
-                product.ShortDescription = template.ShortDescription;
-                product.Description = template.Description;
-                product.Price = template.Price;
-                product.OldPrice = template.OldPrice;
-                product.StockQuantity = Math.Max(product.StockQuantity, template.StockQuantity);
-                product.Volume = template.Volume;
-                product.Concentration = template.Concentration;
-                product.MainImageUrl = template.MainImageUrl;
-                product.IsFeatured = template.IsFeatured;
-                product.IsBestseller = template.IsBestseller;
-                product.IsActive = true;
-                product.UpdatedAt = DateTimeOffset.UtcNow;
+                // Only repair legacy seed images; preserve inventory and admin edits on restart.
+                if (string.IsNullOrWhiteSpace(product.MainImageUrl) || product.MainImageUrl.EndsWith(".svg")
+                    || product.MainImageUrl.Contains("unsplash.com"))
+                    product.MainImageUrl = template.MainImageUrl;
             }
             products.Add(product);
         }

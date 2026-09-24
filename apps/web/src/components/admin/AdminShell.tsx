@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Layout, Menu, theme } from "antd";
+import { ConfigProvider, Layout, Menu, theme } from "antd";
 import { AppstoreOutlined, DashboardOutlined, OrderedListOutlined, SettingOutlined, TagsOutlined, TeamOutlined } from "@ant-design/icons";
+
+import { BrandLogo } from "@/components/BrandLogo";
+import { useShop } from "@/components/ShopProvider";
 
 const { Content, Sider } = Layout;
 
@@ -16,11 +19,12 @@ const items = [
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
+  const shop = useShop();
   const { token } = theme.useToken();
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <ConfigProvider theme={{ token: { colorPrimary: shop.primaryColor, colorInfo: shop.accentColor, borderRadius: 6 }, components: { Layout: { siderBg: "#171512" }, Menu: { darkItemBg: "#171512", darkItemSelectedBg: "#665126" } } }}><Layout style={{ minHeight: "100vh" }}>
       <Sider breakpoint="lg" collapsedWidth="0">
-        <div style={{ color: "white", fontWeight: 800, fontSize: 24, padding: 20 }}>Aromera</div>
+        <Link href="/" className="block p-4"><BrandLogo compact /><span className="mt-2 block text-xs text-white/70">{shop.name} Admin</span></Link>
         <Menu theme="dark" mode="inline" items={items} />
       </Sider>
       <Layout>
@@ -28,6 +32,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {children}
         </Content>
       </Layout>
-    </Layout>
+    </Layout></ConfigProvider>
   );
 }

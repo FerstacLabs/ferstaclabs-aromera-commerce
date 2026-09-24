@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #171513;
-  --soft-ink: #5c5349;
-  --paper: #fbfaf7;
-  --mist: #f2eee7;
-  --line: #ded4c3;
-  --gold: #b89146;
+  --ink: #171512;
+  --soft-ink: #6f675d;
+  --paper: #f7f3ea;
+  --mist: #eee5d1;
+  --line: rgba(185,144,69,0.30);
+  --gold: #b99045;
   --olive: #5f6f52;
   --rose: #8c4f54;
 }
 
 * {
   box-sizing: border-box;
+  letter-spacing: 0 !important;
 }
 
 body {
@@ -36,6 +37,7 @@ select {
 
 .display {
   font-family: var(--font-display), Georgia, serif;
+  overflow-wrap: anywhere;
 }
 
 .container {
@@ -90,3 +92,32 @@ select {
   min-height: 96px;
   padding-block: 10px;
 }
+
+:focus-visible { outline: 2px solid #8b692a; outline-offset: 4px; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+.grid > *, .flex > * { min-width: 0; }
+.product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.product-card { transition: border-color .2s, transform .2s; }
+.product-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+.product-card .gold-button { font-size: 12px; padding-inline: 6px; }
+.product-card .gold-button svg { flex-shrink: 0; }
+.hero { position: relative; isolation: isolate; background: #171512; color: white; }
+.hero-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: right center; z-index: -2; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(23,21,18,.94), rgba(23,21,18,.75) 42%, rgba(23,21,18,.08)); z-index: -1; }
+.hero-content { min-height: min(630px, 76svh); padding-block: 56px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.hero h1 { font-size: 72px; line-height: 1; }
+.hero .hero-copy { max-width: 500px; }
+.ant-layout-content { min-width: 0; }
+.ant-table-content { overflow-x: auto; }
+@media (min-width: 1024px) { .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; } }
+@media (max-width: 600px) {
+  .hero h1 { font-size: 48px; }
+  .hero-content { min-height: 570px; padding-block: 40px; }
+  .hero::after { background: rgba(23,21,18,.74); }
+  .hero-photo { object-fit: cover; object-position: 64% center; }
+  .product-card > div { padding: 12px; }
+  .product-card .display { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }

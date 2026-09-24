@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CardPaymentModal } from "@/components/checkout/CardPaymentModal";
 import { useCart } from "@/lib/cart";
+import { useShop } from "@/components/ShopProvider";
+import { shopSlug, whatsappLink } from "@/lib/shop";
 
 type CheckoutResponse = {
   orderId: string;
@@ -27,6 +29,8 @@ type PaymentCreateResponse = {
 };
 
 export function CheckoutForm() {
+  const shop = useShop();
+  const [deliveryMethod, setDeliveryMethod] = useState("baku");
   const router = useRouter();
   const { items, clear } = useCart();
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -35,7 +39,8 @@ export function CheckoutForm() {
   const [cardPayment, setCardPayment] = useState<PaymentCreateResponse | null>(null);
   const [paymentError, setPaymentError] = useState("");
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const payableTotal = total + (total >= 150 ? 0 : 5);
+  const deliveryFee = total >= shop.freeDeliveryFrom ? 0 : deliveryMethod === "regions" ? shop.regionsFee : shop.bakuFee;
+  const payableTotal = total + deliveryFee;
 
   async function submit(formData: FormData) {
     if (items.length === 0) {
@@ -56,7 +61,7 @@ export function CheckoutForm() {
     };
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
     try {
-      const response = await fetch(`${api}/api/${process.env.NEXT_PUBLIC_SHOP_SLUG ?? "aromera"}/checkout`, {
+      const response = await fetch(`${api}/api/${shopSlug}/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -66,7 +71,7 @@ export function CheckoutForm() {
 
       if (paymentMethod === "whatsapp") {
         const summary = items.map((item) => `${item.name} x${item.quantity}`).join(", ");
-        window.open(`https://wa.me/994505555555?text=${encodeURIComponent(`Aromera sifarişi ${result.orderNumber}: ${summary}. Cəmi: ${payableTotal} AZN`)}`, "_blank");
+        window.open(`${whatsappLink(shop)}?text=${encodeURIComponent(`${shop.name} sifarişi ${result.orderNumber}: ${summary}. Cəmi: ${payableTotal} AZN`)}`, "_blank", "noopener,noreferrer");
         clear();
         router.push(`/checkout/success?orderNumber=${encodeURIComponent(result.orderNumber)}&paymentStatus=${result.paymentStatus}`);
         return;
@@ -78,7 +83,7 @@ export function CheckoutForm() {
         return;
       }
 
-      const paymentResponse = await fetch(`${api}/api/${process.env.NEXT_PUBLIC_SHOP_SLUG ?? "aromera"}/payments/create`, {
+      const paymentResponse = await fetch(`${api}/api/${shopSlug}/payments/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: result.orderId }),
@@ -110,7 +115,7 @@ export function CheckoutForm() {
     setPaymentError("");
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
     try {
-      const response = await fetch(`${api}/api/${process.env.NEXT_PUBLIC_SHOP_SLUG ?? "aromera"}/payments/mock/confirm`, {
+      const response = await fetch(`${api}/api/${shopSlug}/payments/mock/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: cardPayment.orderId, result }),
@@ -132,18 +137,18 @@ export function CheckoutForm() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <form action={submit} className="card grid gap-4 p-5">
+      <form action={submit} className="grid gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <input className="field" name="name" placeholder="Ad Soyad" required />
-          <input className="field" name="phone" placeholder="Telefon" required />
+          <label className="grid gap-2 text-sm">Ad Soyad<input className="field" name="name" autoComplete="name" required /></label>
+          <label className="grid gap-2 text-sm">Telefon<input className="field" name="phone" type="tel" autoComplete="tel" required /></label>
         </div>
-        <input className="field" name="email" placeholder="Email" />
-        <textarea className="field textarea" name="address" placeholder="Çatdırılma ünvanı" required />
-        <textarea className="field textarea" name="note" placeholder="Qeyd" />
-        <select className="field" name="deliveryMethod">
+        <label className="grid gap-2 text-sm">Email<input className="field" name="email" type="email" autoComplete="email" /></label>
+        <label className="grid gap-2 text-sm">Çatdırılma ünvanı<textarea className="field textarea" name="address" autoComplete="street-address" required /></label>
+        <label className="grid gap-2 text-sm">Qeyd<textarea className="field textarea" name="note" /></label>
+        <label className="grid gap-2 text-sm">Çatdırılma<select className="field" name="deliveryMethod" value={deliveryMethod} onChange={(e) => setDeliveryMethod(e.target.value)}>
           <option value="baku">Bakı daxili çatdırılma</option>
           <option value="regions">Regionlara çatdırılma</option>
-        </select>
+        </select></label>
         <div className="grid gap-2">
           {[
             ["card", "Kartla ödəniş"],
@@ -162,7 +167,7 @@ export function CheckoutForm() {
         <h2 className="font-bold">Ödəniş xülasəsi</h2>
         <div className="mt-4 grid gap-2 text-sm">
           <div className="flex justify-between"><span>Məhsullar</span><strong>{total} AZN</strong></div>
-          <div className="flex justify-between"><span>Çatdırılma</span><strong>{total >= 150 ? 0 : 5} AZN</strong></div>
+          <div className="flex justify-between"><span>Çatdırılma</span><strong>{deliveryFee} AZN</strong></div>
           <div className="border-t border-[var(--line)] pt-3 text-base flex justify-between"><span>Cəmi</span><strong>{payableTotal} AZN</strong></div>
         </div>
       </aside>

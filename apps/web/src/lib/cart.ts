@@ -31,6 +31,18 @@ export const useCart = create<CartState>()(
         set((state) => ({ items: state.items.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item)) })),
       clear: () => set({ items: [] }),
     }),
-    { name: "aromera-cart" },
+    {
+      name: "aromera-cart",
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as CartState;
+        return { ...state, items: state.items.map((item) => ({ ...item,
+          name: item.name.replace("Aromera ", ""),
+          brand: ({ "Aromera Private": "Əhdi Selection", "Maison Aura": "Premium Collection", "Noir Atelier": "Signature Collection" } as Record<string, string>)[item.brand] ?? item.brand,
+          slug: item.slug === "aromera-noir-essence" ? "noir-essence" : item.slug,
+          mainImageUrl: item.mainImageUrl.replace("aromera-noir-essence", "noir-essence"),
+        })) };
+      },
+    },
   ),
 );

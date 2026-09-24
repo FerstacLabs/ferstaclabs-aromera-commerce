@@ -1,6 +1,9 @@
 namespace Aromera.Application;
 
 public sealed record LoginRequest(string Email, string Password);
+public sealed record ShopSettingsRequest(string Name, string? LegalName, string? Voen, string Phone,
+    string WhatsApp, string Address, string LogoUrl, string Slogan, string HeroText,
+    string PrimaryColor, string AccentColor);
 public sealed record AuthResponse(string Token, string Email, string Role, string ShopSlug);
 public sealed record CheckoutItem(Guid ProductId, int Quantity);
 public sealed record CheckoutRequest(
@@ -48,4 +51,6 @@ public sealed record UpsertProductRequest(
     string MainImageUrl,
     bool IsFeatured,
     bool IsBestseller,
-    bool IsActive);
+    bool IsActive,
+    List<ProductImageRequest>? Images = null);
+public sealed record ProductImageRequest(string Url, string? Alt);

@@ -13,7 +13,7 @@ export default async function SuccessPage({ searchParams }: { searchParams: Prom
         {orderNumber ? <p className="mt-3 text-sm font-bold text-[var(--gold)]">Sifariş nömrəsi: {orderNumber}</p> : null}
         <p className="mx-auto mt-3 max-w-xl text-[var(--soft-ink)]">Sifarişiniz qəbul edildi.</p>
         {isPaid ? <p className="mx-auto mt-2 max-w-xl font-semibold text-[var(--ink)]">Ödəniş uğurla tamamlandı.</p> : null}
-        <p className="mx-auto mt-2 max-w-xl text-[var(--soft-ink)]">Aromera komandası sifarişinizi təsdiqləmək üçün sizinlə əlaqə saxlayacaq.</p>
+        <p className="mx-auto mt-2 max-w-xl text-[var(--soft-ink)]">Mağaza komandası sifarişinizi təsdiqləmək üçün sizinlə əlaqə saxlayacaq.</p>
         <Link className="gold-button mt-6" href="/shop">Alışa davam et</Link>
       </section>
     </SiteShell>

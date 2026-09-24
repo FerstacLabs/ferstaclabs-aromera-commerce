@@ -4,10 +4,13 @@ import Link from "next/link";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { SafeProductImage } from "../SafeProductImage";
+import { useShop } from "../ShopProvider";
 
 export function CartView() {
+  const shop = useShop();
   const { items, remove, setQuantity } = useCart();
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const fee = total >= shop.freeDeliveryFrom ? 0 : shop.bakuFee;
 
   if (items.length === 0) {
     return (
@@ -51,10 +54,10 @@ export function CartView() {
         <h2 className="font-bold">Sifariş xülasəsi</h2>
         <div className="mt-4 grid gap-2 text-sm">
           <div className="flex justify-between"><span>Məhsullar</span><strong>{total} AZN</strong></div>
-          <div className="flex justify-between"><span>Çatdırılma</span><strong>{total >= 150 ? "0" : "5"} AZN</strong></div>
-          <div className="border-t border-[var(--line)] pt-3 text-base flex justify-between"><span>Cəmi</span><strong>{total + (total >= 150 ? 0 : 5)} AZN</strong></div>
+          <div className="flex justify-between"><span>Çatdırılma</span><strong>{fee} AZN</strong></div>
+          <div className="border-t border-[var(--line)] pt-3 text-base flex justify-between"><span>Cəmi</span><strong>{total + fee} AZN</strong></div>
         </div>
-        <Link className="gold-button mt-5 w-full" href="/checkout">Checkout</Link>
+        <Link className="gold-button mt-5 w-full" href="/checkout">Sifarişi tamamla</Link>
       </aside>
     </div>
   );

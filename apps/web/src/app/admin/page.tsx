@@ -7,7 +7,7 @@ import { dashboard, orders } from "@/lib/admin-data";
 export default function AdminDashboardPage() {
   return (
     <AdminShell>
-      <Typography.Title level={2}>Dashboard</Typography.Title>
+      <Typography.Title level={2}>Əhdi Parfum — İdarəetmə Paneli</Typography.Title>
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6}><Card><Statistic title="Today orders" value={dashboard.todayOrders} /></Card></Col>
         <Col xs={24} md={6}><Card><Statistic title="Total revenue" value={dashboard.totalRevenue} suffix="AZN" /></Card></Col>

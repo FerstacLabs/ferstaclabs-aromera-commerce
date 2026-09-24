@@ -1,22 +1,33 @@
 "use client";
-
-import { Button, Card, Form, Input, Typography, message } from "antd";
+import { useEffect, useState } from "react";
+import { Button, Form, Input, Typography, message, Alert } from "antd";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { shop } from "@/lib/data";
+import { adminRequest } from "@/lib/admin-api";
+import type { ShopConfig } from "@/lib/shop";
 
 export default function StoreSettingsPage() {
-  return (
-    <AdminShell>
-      <Card title={<Typography.Title level={3}>Store settings</Typography.Title>}>
-        <Form layout="vertical" initialValues={{ name: shop.name, phone: shop.phone, whatsapp: shop.whatsapp, instagram: shop.instagram, address: shop.address }} onFinish={() => message.success("Saved")}>
-          <Form.Item label="Name" name="name"><Input /></Form.Item>
-          <Form.Item label="Phone" name="phone"><Input /></Form.Item>
-          <Form.Item label="WhatsApp" name="whatsapp"><Input /></Form.Item>
-          <Form.Item label="Instagram" name="instagram"><Input /></Form.Item>
-          <Form.Item label="Address" name="address"><Input /></Form.Item>
-          <Button type="primary" htmlType="submit">Save</Button>
-        </Form>
-      </Card>
-    </AdminShell>
-  );
+  const [form] = Form.useForm();
+  const [ready, setReady] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    adminRequest<ShopConfig>("shop/settings").then((data) => { form.setFieldsValue(data); setReady(true); }).catch((e) => setError(e.message));
+  }, [form]);
+  async function save(values: ShopConfig) {
+    setSaving(true);
+    try { await adminRequest("shop/settings", { method: "PUT", body: JSON.stringify(values) }); message.success("Mağaza məlumatları saxlanıldı"); }
+    catch (e) { message.error(e instanceof Error ? e.message : "Saxlanmadı"); }
+    finally { setSaving(false); }
+  }
+  return <AdminShell><Typography.Title level={2}>Mağaza ayarları</Typography.Title>
+    {error && <Alert type="error" title={error} showIcon />}
+    <Form form={form} layout="vertical" onFinish={save} disabled={!ready} style={{ maxWidth: 760 }}>
+      <div className="grid gap-x-5 sm:grid-cols-2">
+        {[["name", "Brend adı"], ["legalName", "Hüquqi ad"], ["voen", "VÖEN"], ["phone", "Telefon"], ["whatsApp", "WhatsApp"], ["address", "Ünvan"], ["logoUrl", "Loqo"], ["slogan", "Sloqan"]].map(([name, label]) => <Form.Item key={name} name={name} label={label} rules={["name", "phone", "whatsApp", "address"].includes(name) ? [{ required: true }] : []}><Input /></Form.Item>)}
+      </div>
+      <Form.Item name="heroText" label="Ana səhifə mətni"><Input.TextArea rows={2} /></Form.Item>
+      <div className="flex flex-wrap gap-8">{[["primaryColor", "Əsas rəng"], ["accentColor", "Vurğu rəngi"]].map(([name, label]) => <Form.Item key={name} name={name} label={label} rules={[{ required: true, pattern: /^#[0-9a-f]{6}$/i }]}><Input type="color" style={{ width: 72, height: 44 }} /></Form.Item>)}</div>
+      <Button type="primary" htmlType="submit" loading={saving} disabled={!ready}>Saxla</Button>
+    </Form>
+  </AdminShell>;
 }

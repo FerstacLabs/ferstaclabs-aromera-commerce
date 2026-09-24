@@ -12,6 +12,9 @@ public sealed class Shop
     public string? Email { get; set; }
     public string? Instagram { get; set; }
     public string Address { get; set; } = "";
+    public string LogoUrl { get; set; } = "/brand/ehdi-hasan-logo.svg";
+    public string Slogan { get; set; } = "BİR KEYFİYYƏT BRENDİ";
+    public string HeroText { get; set; } = "Ətirinizi seçin. İziniz yadda qalsın.";
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -52,6 +55,8 @@ public sealed class Category
 
 public sealed class Product
 {
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public List<ProductImage> Images { get; set; } = [];
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ShopId { get; set; }
     public Guid CategoryId { get; set; }
@@ -161,8 +166,8 @@ public sealed class ThemeSetting
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ShopId { get; set; }
-    public string PrimaryColor { get; set; } = "#111111";
-    public string AccentColor { get; set; } = "#b89146";
+    public string PrimaryColor { get; set; } = "#171512";
+    public string AccentColor { get; set; } = "#B99045";
 }
 
 public sealed class InventoryLog

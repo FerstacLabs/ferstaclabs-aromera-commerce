@@ -8,7 +8,7 @@ import { useCart } from "@/lib/cart";
 export function AddToCartButton({ product }: { product: Product }) {
   const add = useCart((state) => state.add);
   return (
-    <button className="gold-button" onClick={() => { add(product); toast.success("Məhsul səbətə əlavə olundu"); }}>
+    <button className="gold-button" disabled={product.stockQuantity <= 0} onClick={() => { add(product); toast.success("Məhsul səbətə əlavə olundu"); }}>
       <ShoppingBag size={18} /> Səbətə əlavə et
     </button>
   );

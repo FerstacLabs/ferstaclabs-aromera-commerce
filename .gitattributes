@@ -1,0 +1,2 @@
+# EF Core generates C# migration files with Windows line endings.
+apps/api/Aromera.Infrastructure/Migrations/*.cs whitespace=cr-at-eol

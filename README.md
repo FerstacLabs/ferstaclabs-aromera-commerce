@@ -1,147 +1,110 @@
-# Aromera Commerce
+# Əhdi Parfum Commerce
 
-Multi-tenant e-commerce platform for retail shops in Azerbaijan. The first tenant is **Aromera**, a premium perfume storefront with its own products, branding, admin area, delivery settings, and payment configuration.
-
-## Tech Stack
-
-- `apps/web`: Next.js App Router, TypeScript, Tailwind CSS, Ant Design for `/admin`
-- `apps/api`: ASP.NET Core 8 Web API, EF Core, PostgreSQL, JWT auth, Swagger
-- Payments: provider abstraction with Mock, Epoint structure, and Payriff structure
-- Local infrastructure: Docker Compose with PostgreSQL, API, optional pgAdmin
+The existing Next.js / ASP.NET Core 8 multi-tenant application, rebranded for **Əhdi Parfum** (Ehdi Hasan Parfumer's). Internal solution and namespace names remain AromeraCommerce.
 
 ## Structure
 
-```txt
-apps/
-  web/
-  api/
-    Aromera.Api/
-    Aromera.Application/
-    Aromera.Domain/
-    Aromera.Infrastructure/
-docker-compose.yml
-README.md
-```
+- `apps/web`: Next.js App Router, TypeScript, Tailwind, Ant Design admin.
+- `apps/api`: ASP.NET Core 8, EF Core, PostgreSQL, JWT, payment providers.
+- `apps/web/public/brand`: EH full logo, compact logo, monogram and SVG favicon.
+- `apps/web/public/products`: local WebP perfume photography.
 
-## Local Setup
+## Local Development
 
-Frontend:
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-Backend:
-
-```bash
+```powershell
 cd apps/api
 dotnet restore
-dotnet ef database update --project Aromera.Infrastructure --startup-project Aromera.Api
 dotnet run --project Aromera.Api
 ```
 
-Docker:
+Configure `ConnectionStrings__DefaultConnection` for a local PostgreSQL database. Startup applies EF migrations before running the seed. In another terminal:
 
-```bash
-docker compose up --build
+```powershell
+cd apps/web
+npm ci
+npm run dev
 ```
 
-Swagger is available at `http://localhost:5000/swagger` in development.
-
-## Environment Variables
-
-Frontend example is in `apps/web/.env.example`:
+Frontend environment example: `apps/web/.env.example`.
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
-NEXT_PUBLIC_SHOP_SLUG=aromera
-NEXT_PUBLIC_WHATSAPP_NUMBER=994505555555
+NEXT_PUBLIC_SHOP_SLUG=ehdi-parfum
 ```
 
-Backend example is in `apps/api/Aromera.Api/appsettings.example.json`. Environment variables can override nested settings, for example:
+Public contact details are centralized in the shop database, with verified offline defaults in `apps/web/src/lib/shop.ts`. Phone and WhatsApp: +994 55 699 46 66. Address: Bakı şəhəri, Qara Qarayev küçəsi 74A. No unverified email or social profile is displayed. WhatsApp links are derived from shop settings; `NEXT_PUBLIC_WHATSAPP_NUMBER` is no longer used.
 
-```bash
-ConnectionStrings__DefaultConnection=Host=localhost;Port=5432;Database=aromera_commerce;Username=postgres;Password=postgres
-Jwt__Secret=CHANGE_ME_TO_LONG_RANDOM_SECRET
-Payments__DefaultProvider=Mock
-```
+## Rebrand Migration
 
-## Seed Data
+`20260924085517_RebrandEhdiParfum` adds `Shop.LogoUrl`, `Shop.Slogan` and `Shop.HeroText`. It updates the **same** shop from `aromera` to `ehdi-parfum`, preserving its ID, legal name and VÖEN. Products, orders, users, delivery settings and payment configuration remain associated with that ID. A collision between both slugs aborts the transaction for manual resolution; it never creates a replacement tenant.
 
-On startup, the API applies migrations and seeds the Aromera shop if the database is empty:
+The migration clears the unverified public email/social fields, updates branding/theme, replaces legacy collection labels and renames the first product to Noir Essence. The old product URL redirects permanently. Old API tenant URLs remain compatible during deployment. Existing admin credentials and browser cart/auth storage keys are retained; stored cart labels migrate without clearing quantities.
 
-- 1 shop: `aromera`
-- 7 categories
-- 24 perfume products
-- admin user
-- payment provider settings
-- delivery/theme settings
-- initial customers and orders for dashboard data
+Seed runs preserve admin edits, prices, stock, descriptions and activation flags. Missing seed products are inserted by `ShopId + Slug`; only legacy seed image paths are repaired. Settings are not reset at every startup. Catalog products remain temporary neutral content, not a claim about the real store's inventory or manufacturing.
 
-Admin login:
-
-```txt
-Email: admin@aromera.az
-Password: Admin123!ChangeMe
-```
-
-Passwords are stored with PBKDF2 hashing.
+Admin store settings persist brand name, legal name, VÖEN, phone, WhatsApp, address, logo, slogan, hero text and theme colors. Product editing persists all catalog fields and ordered image galleries. Public configuration and catalog reads revalidate every 60 seconds.
 
 ## Product Images
 
-Product images are served from `apps/web/public/products`. Seeded product `MainImageUrl` values should use the `/products/{slug}.webp` format, for example `/products/midnight-musk.webp`. The seed routine also updates existing Aromera products by `ShopId + Slug` on startup so production databases with older external image URLs are corrected without duplicating products.
+Product images are served from `apps/web/public/products`; product `MainImageUrl` should use `/products/{slug}.webp`. Images do not require external hosts at runtime. Cards, galleries and cart images fall back to `/products/fallback-perfume.webp`. The first product now uses `/products/noir-essence.webp`.
 
-## API Highlights
+## Payment Behavior
 
-- `POST /api/auth/login`
-- `GET /api/shops/by-slug/{slug}`
-- `GET /api/{shopSlug}/products`
-- `GET /api/{shopSlug}/products/{slug}`
-- `POST /api/{shopSlug}/checkout`
-- `POST /api/{shopSlug}/payments/create`
-- `POST /api/{shopSlug}/payments/epoint/callback`
-- `POST /api/{shopSlug}/payments/payriff/callback`
-- `GET /api/admin/orders`
-- `PUT /api/admin/orders/{id}/status`
+Card orders are pending until the existing internal confirmation or hosted provider flow finishes. Cash and WhatsApp orders remain unpaid. The internal card form never sends PAN, expiry or CVV to the API: confirmation contains only `orderId` and `result`. Provider selection is pinned to the checkout payment: clients cannot downgrade hosted payments, confirm cash/WhatsApp through Mock, or reverse paid status with a replay. Epoint/Payriff hosted-provider architecture is unchanged; this rebrand does not complete their existing merchant integration stubs.
 
-Admin endpoints read `shopId` from JWT claims so each admin only sees their own shop data.
+Checkout and cart read delivery prices from the shop's database configuration, and the API calculates the authoritative delivery amount.
 
-## Payments
+Existing admin login credentials are unchanged. The development seed account remains `admin@aromera.az` with its existing password; this internal login identifier is not a public contact address. Change seeded credentials before public operation.
 
-Each shop owns its payment configuration through `PaymentProviderSetting`.
+## Verification
 
-- Mock: local provider that marks card orders as paid.
-- Epoint: provider structure is present with TODO markers for merchant credentials and callback signature validation.
-- Payriff: provider placeholder is present with TODO markers for live merchant API integration.
+```powershell
+cd apps/api
+dotnet build AromeraCommerce.sln
+cd ../web
+npm run lint
+npm run build
+npm run start -- -p 3005
+```
 
-Do not place real private keys in frontend code or committed config files.
+Browser regression tests use local URLs only and Microsoft Edge via Playwright:
 
-## Deployment Notes
+```powershell
+cd apps/web
+npm run test:e2e
+```
 
-Vercel:
+Start the local API on port 5000 and web on 3005. The tests expect an isolated PostgreSQL QA database with `InitialCreate` applied, then `tests/rebrand-legacy-fixture.sql` loaded **before** API startup applies the rebrand migration. Never load this fixture into production. `tests/rebrand-assertions.sql` verifies tenant identity, historical orders/users, unchanged inventory/delivery and absence of duplicate seed products, including after restart.
 
-1. Deploy `apps/web`.
-2. Set `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SHOP_SLUG`, and `NEXT_PUBLIC_WHATSAPP_NUMBER`.
-3. Configure image domains if adding new external image hosts.
+Browser coverage includes /, /shop, /shop/[slug], /cart, /checkout, checkout success/failure, /about, /contact, /admin/login, /admin, /admin/products, /admin/orders, /admin/settings and store settings. Responsive checks cover 375, 430, 768, 1024 and 1440 pixels. Checkout tests cover card confirmation, decline/retry, cash, WhatsApp, image fallback and admin saves.
 
-Backend Docker hosting:
+## Production Deployment
 
-1. Build from `apps/api/Dockerfile`.
-2. Provide PostgreSQL connection string and JWT settings as environment variables.
-3. Run migrations on startup or via `dotnet ef database update`.
-4. Set `FrontendUrl` to the production Vercel domain for CORS.
+Deploy the API first, then the frontend. Keep the existing Railway PostgreSQL service and volume. Do not reset, delete or recreate the production database. Take a normal backup before the schema migration.
 
-The API is ready for Render, Fly.io, Hetzner VPS, DigitalOcean App Platform, or any Docker host.
+From the repository root, targeting the existing Railway service:
 
-## Production Checklist
+```powershell
+railway up apps/api --path-as-root --service aromera-api --environment production --detach
+```
 
-- Replace JWT secret with a long random value.
-- Add real encryption implementation for payment credentials.
-- Enable and validate Epoint/Payriff merchant credentials per shop.
-- Confirm callback signature validation before live card payments.
-- Restrict CORS to production domains.
-- Add HTTPS reverse proxy settings for backend hosting.
-- Add monitoring, backups, and log retention.
-- Add CI for `dotnet build`, migrations, `npm run lint`, and `npm run build`.
+The existing Dockerfile publishes the API. Container startup command is `dotnet Aromera.Api.dll`; startup automatically executes `Database.MigrateAsync()` and the idempotent seed. There is no separate destructive database command. Keep `ConnectionStrings__DefaultConnection`, JWT settings, payment settings and `FrontendUrl` unchanged.
+
+Check Railway deployment health and logs before deploying the web app. Confirm `GET /api/shops/by-slug/ehdi-parfum` returns the original shop ID, new name, phone and slogan.
+
+In the existing Vercel **aromera** project, update the Production (and relevant Preview) environment variable:
+
+```env
+NEXT_PUBLIC_SHOP_SLUG=ehdi-parfum
+```
+
+**Do not change NEXT_PUBLIC_API_URL.** No new mandatory backend environment variables are required. OpenGraph uses Vercel's production-domain environment value; `NEXT_PUBLIC_SITE_URL` is optional when a custom canonical domain is needed.
+
+From the frontend directory linked to the existing Vercel project:
+
+```powershell
+cd apps/web
+vercel --prod
+```
+
+The linked Vercel project's root directory is `.`, so upload from `apps/web`. These CLI commands deploy to existing projects. Git push alone should not be treated as proof of a healthy deployment; verify both dashboards and the public pages afterwards.

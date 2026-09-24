@@ -75,31 +75,40 @@ app.MapPost("/api/auth/login", async (LoginRequest request, AromeraDbContext db,
     };
     var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)), SecurityAlgorithms.HmacSha256);
     var token = new JwtSecurityToken(builder.Configuration["Jwt:Issuer"], builder.Configuration["Jwt:Audience"], claims, expires: DateTime.UtcNow.AddHours(8), signingCredentials: credentials);
-    return Results.Ok(new AuthResponse(new JwtSecurityTokenHandler().WriteToken(token), user.Email, user.Role, user.Shop?.Slug ?? "aromera"));
+    return Results.Ok(new AuthResponse(new JwtSecurityTokenHandler().WriteToken(token), user.Email, user.Role, user.Shop?.Slug ?? "ehdi-parfum"));
 });
 app.MapPost("/api/auth/refresh", [Authorize] () => Results.Ok());
 app.MapPost("/api/auth/logout", [Authorize] () => Results.NoContent());
 app.MapGet("/api/auth/me", [Authorize] (ClaimsPrincipal user) => Results.Ok(new { email = user.FindFirstValue(ClaimTypes.Email), role = user.FindFirstValue(ClaimTypes.Role), shopSlug = user.FindFirstValue("shopSlug") }));
 
 app.MapGet("/api/shops/by-slug/{slug}", async (string slug, AromeraDbContext db) =>
-    await db.Shops.FirstOrDefaultAsync(x => x.Slug == slug && x.IsActive) is { } shop ? Results.Ok(shop) : Results.NotFound());
+    await db.Shops.FirstOrDefaultAsync(x => x.Slug == (slug == "aromera" ? "ehdi-parfum" : slug) && x.IsActive) is { } shop ? Results.Ok(await ShopConfiguration(shop, db)) : Results.NotFound());
 app.MapGet("/api/shops/current", async (AromeraDbContext db) =>
-    await db.Shops.FirstOrDefaultAsync(x => x.Slug == "aromera" && x.IsActive) is { } shop ? Results.Ok(shop) : Results.NotFound());
-app.MapPut("/api/admin/shop/settings", [Authorize] async (Shop input, ClaimsPrincipal user, AromeraDbContext db) =>
+    await db.Shops.FirstOrDefaultAsync(x => x.Slug == "ehdi-parfum" && x.IsActive) is { } shop ? Results.Ok(await ShopConfiguration(shop, db)) : Results.NotFound());
+app.MapGet("/api/admin/shop/settings", [Authorize] async (ClaimsPrincipal user, AromeraDbContext db) =>
+    await CurrentShop(user, db) is { } shop ? Results.Ok(await ShopConfiguration(shop, db)) : Results.NotFound());
+app.MapPut("/api/admin/shop/settings", [Authorize] async (ShopSettingsRequest input, ClaimsPrincipal user, AromeraDbContext db) =>
 {
     var shop = await CurrentShop(user, db);
     if (shop is null) return Results.NotFound();
     shop.Name = input.Name; shop.Phone = input.Phone; shop.WhatsApp = input.WhatsApp; shop.Address = input.Address;
-    shop.Email = input.Email; shop.Instagram = input.Instagram; shop.UpdatedAt = DateTimeOffset.UtcNow;
+    if (string.IsNullOrWhiteSpace(input.Name) || !System.Text.RegularExpressions.Regex.IsMatch(input.PrimaryColor ?? "", "^#[0-9a-fA-F]{6}$")
+        || !System.Text.RegularExpressions.Regex.IsMatch(input.AccentColor ?? "", "^#[0-9a-fA-F]{6}$"))
+        return Results.BadRequest(new { message = "Ad və rəngləri yoxlayın." });
+    shop.LegalName = input.LegalName; shop.Voen = input.Voen; shop.LogoUrl = input.LogoUrl;
+    shop.Slogan = input.Slogan; shop.HeroText = input.HeroText; shop.UpdatedAt = DateTimeOffset.UtcNow;
+    var theme = await db.ThemeSettings.FirstOrDefaultAsync(x => x.ShopId == shop.Id);
+    if (theme is null) { theme = new ThemeSetting { ShopId = shop.Id }; db.ThemeSettings.Add(theme); }
+    theme.PrimaryColor = input.PrimaryColor!; theme.AccentColor = input.AccentColor!;
     await db.SaveChangesAsync();
-    return Results.Ok(shop);
+    return Results.Ok(await ShopConfiguration(shop, db));
 });
 
 app.MapGet("/api/{shopSlug}/categories", async (string shopSlug, AromeraDbContext db) =>
-    await db.Categories.Where(x => x.ShopId == db.Shops.Where(s => s.Slug == shopSlug).Select(s => s.Id).FirstOrDefault() && x.IsActive).OrderBy(x => x.Name).ToListAsync());
+    await db.Categories.Where(x => x.ShopId == db.Shops.Where(s => s.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug)).Select(s => s.Id).FirstOrDefault() && x.IsActive).OrderBy(x => x.Name).ToListAsync());
 app.MapGet("/api/{shopSlug}/products", async (string shopSlug, string? q, string? category, string? gender, string? brand, decimal? minPrice, decimal? maxPrice, AromeraDbContext db) =>
 {
-    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug) && x.IsActive);
     if (shop is null) return Results.NotFound();
     var query = db.Products.Include(x => x.Category).Where(x => x.ShopId == shop.Id && x.IsActive);
     if (!string.IsNullOrWhiteSpace(q)) query = query.Where(x => x.Name.ToLower().Contains(q.ToLower()) || x.Brand.ToLower().Contains(q.ToLower()));
@@ -112,9 +121,10 @@ app.MapGet("/api/{shopSlug}/products", async (string shopSlug, string? q, string
 });
 app.MapGet("/api/{shopSlug}/products/{slug}", async (string shopSlug, string slug, AromeraDbContext db) =>
 {
-    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug) && x.IsActive);
     if (shop is null) return Results.NotFound();
     var product = await db.Products.Include(x => x.Category).FirstOrDefaultAsync(x => x.ShopId == shop.Id && x.Slug == slug && x.IsActive);
+    if (product is not null) product.Images = await db.ProductImages.Where(x => x.ProductId == product.Id).OrderBy(x => x.SortOrder).ToListAsync();
     return product is null ? Results.NotFound() : Results.Ok(product);
 });
 
@@ -122,7 +132,7 @@ app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest 
 {
     if (request.Items.Count == 0 || string.IsNullOrWhiteSpace(request.CustomerName) || string.IsNullOrWhiteSpace(request.CustomerPhone))
         return Results.BadRequest(new { message = "Məlumatları tam doldurun." });
-    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug) && x.IsActive);
     if (shop is null) return Results.NotFound();
     var productIds = request.Items.Select(x => x.ProductId).ToList();
     var products = await db.Products.Where(x => x.ShopId == shop.Id && productIds.Contains(x.Id) && x.IsActive).ToListAsync();
@@ -133,7 +143,7 @@ app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest 
     {
         ShopId = shop.Id,
         CustomerId = customer.Id,
-        OrderNumber = $"ARO-{DateTime.UtcNow:yyyyMMddHHmmss}",
+        OrderNumber = $"EH-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
         Status = request.PaymentMethod == "card" ? "awaiting_payment" : "pending",
         PaymentStatus = request.PaymentMethod == "card" ? "pending" : "unpaid",
         CustomerName = request.CustomerName,
@@ -149,7 +159,8 @@ app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest 
         order.Items.Add(new OrderItem { OrderId = order.Id, ProductId = product.Id, ProductName = product.Name, Quantity = quantity, UnitPrice = product.Price, Total = product.Price * quantity });
     }
     order.Subtotal = order.Items.Sum(x => x.Total);
-    order.DeliveryFee = order.Subtotal >= 150 ? 0 : 5;
+    var delivery = await db.DeliverySettings.FirstOrDefaultAsync(x => x.ShopId == shop.Id) ?? new DeliverySetting();
+    order.DeliveryFee = order.Subtotal >= delivery.FreeDeliveryFrom ? 0 : request.DeliveryMethod == "regions" ? delivery.RegionsFee : delivery.BakuFee;
     order.Total = order.Subtotal + order.DeliveryFee;
     db.Customers.Add(customer);
     db.Orders.Add(order);
@@ -173,17 +184,15 @@ app.MapPost("/api/{shopSlug}/checkout", async (string shopSlug, CheckoutRequest 
 
 app.MapPost("/api/{shopSlug}/payments/create", async (string shopSlug, PaymentCreateRequest request, AromeraDbContext db, PaymentProviderFactory factory) =>
 {
-    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug) && x.IsActive);
     var order = await db.Orders.FirstOrDefaultAsync(x => x.Id == request.OrderId && shop != null && x.ShopId == shop.Id);
     if (shop is null || order is null) return Results.NotFound();
     var payment = await db.Payments.FirstOrDefaultAsync(x => x.ShopId == shop.Id && x.OrderId == order.Id);
-    var providerName = request.Provider ?? payment?.Provider ?? "Mock";
-    if (payment is null)
-    {
-        payment = new Payment { ShopId = shop.Id, OrderId = order.Id, Provider = providerName, Amount = order.Total, Status = "pending" };
-        db.Payments.Add(payment);
-        await db.SaveChangesAsync();
-    }
+    if (payment is null) return Results.BadRequest();
+    // Checkout selects the provider; a browser cannot downgrade a hosted payment to Mock.
+    var providerName = payment.Provider;
+    if (providerName is "Cash" or "WhatsApp" || (request.Provider is not null && !request.Provider.Equals(providerName, StringComparison.OrdinalIgnoreCase)))
+        return Results.BadRequest();
 
     if (providerName.Equals("Mock", StringComparison.OrdinalIgnoreCase))
     {
@@ -205,15 +214,12 @@ app.MapPost("/api/{shopSlug}/payments/create", async (string shopSlug, PaymentCr
 app.MapPost("/api/{shopSlug}/payments/mock/confirm", async (string shopSlug, MockPaymentConfirmRequest request, AromeraDbContext db) =>
 {
     if (request.Result is not ("success" or "failed")) return Results.BadRequest(new { message = "Yanlış ödəniş nəticəsi." });
-    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == shopSlug && x.IsActive);
+    var shop = await db.Shops.FirstOrDefaultAsync(x => x.Slug == (shopSlug == "aromera" ? "ehdi-parfum" : shopSlug) && x.IsActive);
     var order = await db.Orders.FirstOrDefaultAsync(x => x.Id == request.OrderId && shop != null && x.ShopId == shop.Id);
     if (shop is null || order is null) return Results.NotFound();
     var payment = await db.Payments.FirstOrDefaultAsync(x => x.ShopId == shop.Id && x.OrderId == order.Id);
-    if (payment is null)
-    {
-        payment = new Payment { ShopId = shop.Id, OrderId = order.Id, Provider = "Mock", Amount = order.Total, Status = "pending" };
-        db.Payments.Add(payment);
-    }
+    if (payment is null || !payment.Provider.Equals("Mock", StringComparison.OrdinalIgnoreCase)) return Results.BadRequest();
+    if (payment.Status == "paid") return Results.Ok(new { orderId = order.Id, orderNumber = order.OrderNumber, status = payment.Status, paymentStatus = order.PaymentStatus });
 
     if (request.Result == "success")
     {
@@ -244,15 +250,22 @@ var admin = app.MapGroup("/api/admin").RequireAuthorization();
 admin.MapGet("/products", async (ClaimsPrincipal user, AromeraDbContext db) =>
 {
     var shopId = ShopId(user);
-    return await db.Products.Include(x => x.Category).Where(x => x.ShopId == shopId).OrderBy(x => x.Name).ToListAsync();
+    var products = await db.Products.Include(x => x.Category).Where(x => x.ShopId == shopId).OrderBy(x => x.Name).ToListAsync();
+    var ids = products.Select(x => x.Id).ToList();
+    var images = await db.ProductImages.Where(x => ids.Contains(x.ProductId)).OrderBy(x => x.SortOrder).ToListAsync();
+    foreach (var product in products) product.Images = images.Where(x => x.ProductId == product.Id).ToList();
+    return products;
 });
 admin.MapPost("/products", async (UpsertProductRequest request, ClaimsPrincipal user, AromeraDbContext db) =>
 {
     var shopId = ShopId(user);
     var categoryId = request.CategoryId ?? await db.Categories.Where(x => x.ShopId == shopId).Select(x => x.Id).FirstAsync();
+    if (!await db.Categories.AnyAsync(x => x.Id == categoryId && x.ShopId == shopId)) return Results.BadRequest();
+    if (await db.Products.AnyAsync(x => x.ShopId == shopId && x.Slug == request.Slug)) return Results.Conflict();
     var product = new Product { ShopId = shopId, CategoryId = categoryId };
     ApplyProduct(product, request);
     db.Products.Add(product);
+    await ReplaceProductImages(db, product.Id, request.Images);
     await db.SaveChangesAsync();
     return Results.Created($"/api/admin/products/{product.Id}", product);
 });
@@ -261,7 +274,10 @@ admin.MapPut("/products/{id:guid}", async (Guid id, UpsertProductRequest request
     var shopId = ShopId(user);
     var product = await db.Products.FirstOrDefaultAsync(x => x.Id == id && x.ShopId == shopId);
     if (product is null) return Results.NotFound();
+    if (request.CategoryId.HasValue && !await db.Categories.AnyAsync(x => x.Id == request.CategoryId && x.ShopId == shopId)) return Results.BadRequest();
+    if (await db.Products.AnyAsync(x => x.ShopId == shopId && x.Slug == request.Slug && x.Id != id)) return Results.Conflict();
     ApplyProduct(product, request);
+    await ReplaceProductImages(db, product.Id, request.Images);
     product.UpdatedAt = DateTimeOffset.UtcNow;
     await db.SaveChangesAsync();
     return Results.Ok(product);
@@ -368,6 +384,15 @@ admin.MapGet("/dashboard", async (ClaimsPrincipal user, AromeraDbContext db) =>
 
 app.Run();
 
+static async Task<object> ShopConfiguration(Shop shop, AromeraDbContext db)
+{
+    var theme = await db.ThemeSettings.AsNoTracking().FirstOrDefaultAsync(x => x.ShopId == shop.Id) ?? new ThemeSetting();
+    var delivery = await db.DeliverySettings.AsNoTracking().FirstOrDefaultAsync(x => x.ShopId == shop.Id) ?? new DeliverySetting();
+    return new { shop.Id, shop.Name, shop.Slug, shop.LegalName, shop.Voen, shop.Phone, shop.WhatsApp,
+        shop.Address, shop.LogoUrl, shop.Slogan, shop.HeroText, theme.PrimaryColor, theme.AccentColor,
+        delivery = delivery.Note, delivery.BakuFee, delivery.RegionsFee, delivery.FreeDeliveryFrom };
+}
+
 static Guid ShopId(ClaimsPrincipal user) => Guid.Parse(user.FindFirstValue("shopId") ?? Guid.Empty.ToString());
 static async Task<Shop?> CurrentShop(ClaimsPrincipal user, AromeraDbContext db)
 {
@@ -382,4 +407,12 @@ static void ApplyProduct(Product product, UpsertProductRequest request)
     product.Price = request.Price; product.OldPrice = request.OldPrice; product.StockQuantity = request.StockQuantity;
     product.Volume = request.Volume; product.Concentration = request.Concentration; product.MainImageUrl = request.MainImageUrl;
     product.IsFeatured = request.IsFeatured; product.IsBestseller = request.IsBestseller; product.IsActive = request.IsActive;
+}
+
+static async Task ReplaceProductImages(AromeraDbContext db, Guid productId, List<ProductImageRequest>? images)
+{
+    if (images is null) return;
+    db.ProductImages.RemoveRange(await db.ProductImages.Where(x => x.ProductId == productId).ToListAsync());
+    db.ProductImages.AddRange(images.Where(x => !string.IsNullOrWhiteSpace(x.Url)).Select((x, index) =>
+        new ProductImage { ProductId = productId, Url = x.Url, Alt = x.Alt, SortOrder = index }));
 }
