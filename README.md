@@ -80,6 +80,30 @@ Browser coverage includes /, /shop, /shop/[slug], /cart, /checkout, checkout suc
 
 ## Production Deployment
 
+### VPS / Docker Compose CORS
+
+Compose reads `FRONTEND_URL` from the repository-root `.env` and passes it to the API as `FrontendUrl`, the existing ASP.NET Core configuration key. `.env.example` provides the local default; an unset or empty value also falls back to `http://localhost:3000`. The CORS policy still allows only the configured origin, with the existing allowed methods and headers. Use an origin without a trailing slash or path.
+
+On the production VPS, add or update only this line in the existing root `.env` (preserve all secrets and other settings):
+
+```env
+FRONTEND_URL=https://aromera.vercel.app
+```
+
+From the repository root on the VPS:
+
+```bash
+git pull --ff-only origin main
+docker compose config --quiet
+docker compose up -d --build --no-deps --force-recreate api
+```
+
+Recreating the API applies the changed environment; `docker compose restart` alone does not. Existing database volumes and other services are not recreated. Do not print the full resolved Compose configuration on production, as it can contain secrets. Leave the API domain, reverse proxy and frontend API URL unchanged for this CORS-only change.
+
+If the VPS has a temporary `docker-compose.override.yml` with a hardcoded `FrontendUrl`, remove just that environment entry after setting `.env`, so it cannot override the main Compose value. Keep any other developer/server-specific overrides. No override file is required for CORS anymore. For deployments that do not use Compose (including Railway), set the `FrontendUrl` environment variable directly.
+
+### Railway / Vercel
+
 Deploy the API first, then the frontend. Keep the existing Railway PostgreSQL service and volume. Do not reset, delete or recreate the production database. Take a normal backup before the schema migration.
 
 From the repository root, targeting the existing Railway service:

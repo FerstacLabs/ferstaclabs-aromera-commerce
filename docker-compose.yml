@@ -23,7 +23,7 @@ services:
       Jwt__Issuer: AromeraCommerce
       Jwt__Audience: AromeraCommerce
       Jwt__Secret: CHANGE_ME_TO_LONG_RANDOM_SECRET_CHANGE_ME
-      FrontendUrl: http://localhost:3000
+      FrontendUrl: ${FRONTEND_URL:-http://localhost:3000}
       Payments__DefaultProvider: Mock
     ports:
       - "5000:5000"
